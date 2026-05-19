@@ -1,6 +1,28 @@
+# === Python ===
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# === Virtual Environment ===
 .venv/
+venv/
+
+# === Data Files (never commit raw/processed data) ===
 data/
 *.csv
-__pycache__/
-.pytest_cache/
+*.db
+
+# === IDE ===
 .vscode/
+.idea/
+
+# === Environment Variables ===
+.env
+
+# === OS Files ===
+Thumbs.db
+.DS_Store
+
+# === Model Caches ===
+*.egg-info/
