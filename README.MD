@@ -8,8 +8,6 @@ A data engineering and text analytics pipeline designed to scrape, clean, analyz
 
 ```text
 fintech-review-analytics/
-├── .vscode/
-│   └── settings.json
 ├── .github/
 │   └── workflows/
 │       └── unittests.yml
@@ -17,9 +15,7 @@ fintech-review-analytics/
 ├── requirements.txt
 ├── README.md
 ├── data/
-│   ├── raw/
-│   ├── cleaned_reviews.csv
-│   └── processed_analytics.csv
+│   └── raw/
 ├── notebooks/
 │   ├── __init__.py
 │   └── README.md
@@ -35,7 +31,6 @@ fintech-review-analytics/
     ├── scrape_reviews.py
     ├── schema.sql
     └── load_to_postgres.py
-
 ```
 
 ---
@@ -46,9 +41,9 @@ fintech-review-analytics/
 
 Customer reviews are extracted automatically from the Google Play Store using the `google-play-scraper` Python library. The pipeline targets three major Ethiopian banks:
 
-* **Commercial Bank of Ethiopia (CBE)** (App ID: `com.cbe.cbebirrplus` / `com.cbe.cbemobile`)
-* **Bank of Abyssinia (BOA)** (App ID: `com.boamobile.bank` / `com.abyssinia.boadigital`)
-* **Dashen Bank** (App ID: `com.dashen.dashenomni` / `com.dashen.mobilebanking`)
+* **Commercial Bank of Ethiopia (CBE)** (App ID: `com.cbe.cbebirr`)
+* **Bank of Abyssinia (BOA)** (App ID: `com.boamobilebanking.boa`)
+* **Dashen Bank** (App ID: `com.dashen.amole`)
 
 ### Pipeline Fallback Mechanisms
 
@@ -59,7 +54,7 @@ To handle instances where local geographic account configurations mask data avai
 The raw text metrics undergo a systematic sanitization process inside `src/preprocessing.py`:
 
 * **Null Value Filter**: Rows missing essential review text content or star ratings are identified and dropped.
-* **De-duplication**: Absolute duplicate records sharing matching text body, star count, and bank name assignments are removed to eliminate spam.
+* **De-duplication**: Absolute duplicate records sharing matching text body and bank name assignments are removed to eliminate spam.
 * **Date Normalization**: Inconsistent timestamp formats are standardized to uniform `YYYY-MM-DD` strings.
 
 ---
@@ -74,14 +69,19 @@ The text processing pipeline utilizes a pre-trained Deep Learning transformer mo
 
 To ensure accessibility across varying developer environments, the pipeline initialization forces execution directly on the system CPU (`device=-1`). This parameters bypasses legacy CUDA version mismatch exceptions common on older dedicated graphics hardware (such as Nvidia Quadro cards) and guarantees consistent data mapping without crashing.
 
+### TF-IDF Keyword Extraction
+
+The pipeline uses scikit-learn's `TfidfVectorizer` to extract statistically significant unigrams and bigrams from each bank's review corpus. This data-driven approach surfaces the most distinctive terms per bank, supplementing rule-based theme classification with quantitative evidence.
+
 ### Theme Classification
 
-Reviews are grouped into four core operational software themes using rule-based keyword matching heuristics:
+Reviews are grouped into five core operational software themes using rule-based keyword matching heuristics enhanced with TF-IDF-derived insights:
 
 * **Transaction Performance**: Captures speed issues, transfer delays, loading screens, and system timeouts.
 * **Account Access Issues**: Tracks login failures, forgotten passwords, blocked profiles, and OTP delivery issues.
 * **UI & Design**: Groups feedback regarding interface changes, color themes, menu navigation, and visual style.
 * **Customer Support**: Filters mentions of helpline numbers, support agents, bank responses, and branch inquiries.
+* **Feature Requests**: Captures user demands for fingerprint login, notifications, budgeting tools, and other enhancements.
 
 ---
 
@@ -103,7 +103,7 @@ Stores core institutional application meta-properties.
 
 Stores the finalized text logs, scores, and categorical themes.
 
-* `review_id` (INT, PRIMARY KEY): Unique tracking index.
+* `review_id` (SERIAL, PRIMARY KEY): Unique tracking index.
 * `bank_id` (INT, FOREIGN KEY): Maps back to the `banks` table with an automatic `ON DELETE CASCADE` constraint.
 * `review_text` (TEXT): The customer message string.
 * `rating` (INT): Stars awarded, protected by a check constraint (`CHECK (rating >= 1 AND rating <= 5)`).
@@ -131,7 +131,6 @@ git clone https://github.com/yourusername/fintech-review-analytics.git
 cd fintech-review-analytics
 python3 -m venv venv
 source venv/bin/activate
-
 ```
 
 Install project dependencies and download the English spaCy language model pack:
@@ -139,7 +138,6 @@ Install project dependencies and download the English spaCy language model pack:
 ```bash
 pip install -r requirements.txt
 python -m spacy download en_core_web_sm
-
 ```
 
 ---
@@ -151,27 +149,30 @@ Run the following scripts in order to execute the full data engineering cycle:
 1. **Scrape Raw Data**:
 ```bash
 python scripts/scrape_reviews.py
-
 ```
-
 
 2. **Clean and Sanitize Data**:
 ```bash
 python src/preprocessing.py
-
 ```
-
 
 3. **Run Sentiment and Topic Modeling**:
 ```bash
 python src/nlp_analysis.py
-
 ```
-
 
 4. **Ingest to PostgreSQL**:
-*(Ensure you update your database connection configurations in `scripts/load_to_postgres.py` before running this step).*
+*(Ensure you update your database connection configurations via environment variables or in `scripts/load_to_postgres.py` before running this step).*
 ```bash
 python scripts/load_to_postgres.py
-
 ```
+
+### Database Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DB_NAME` | `bank_reviews` | PostgreSQL database name |
+| `DB_USER` | `postgres` | Database user |
+| `DB_PASSWORD` | `postgres` | Database password |
+| `DB_HOST` | `localhost` | Database host |
+| `DB_PORT` | `5432` | Database port |
